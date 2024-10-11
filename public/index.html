@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple PayPal Checkout Web Application</title>
+    <!-- PayPal SDK including client ID and configurations for buttons and currency -->
+    <script src="https://www.paypal.com/sdk/js?client-id=AU4c87p1GOJ5QMEk0is0VU0ByXBbsRrT-7wJ3DCOBigec0INN_WSk19qA-jVPYF5fPW-wpiDXSkxPG-_&components=buttons,funding-eligibility&currency=USD"></script>
+</head>
+<body>
+    <h2>Shopping Cart</h2>
+    <div>
+        <h3>Product</h3>
+        <!-- Dropdown for selecting products -->
+        <label for="product">Choose a product:</label>
+        <select id="product" name="product">
+            <!-- Each option contains price and item number in data attributes -->
+            <option value="sample_product_1" data-price="0.10" data-item-number="12345">Sample Product 1 - $0.10</option> 
+            <option value="sample_product_2" data-price="0.20" data-item-number="67890">Sample Product 2 - $0.20</option>
+        </select>
+    </div>
+
+    <!-- Hidden fields to store the selected product's price and item number for later use -->
+    <input type="hidden" id="product-price" value="0.10">
+    <input type="hidden" id="item-number" value="12345">
+
+    <h3>Buyer Information</h3>
+    <!-- Form for buyer information, laid out with flexbox for simplicity -->
+    <form id="buyer-info" style="display: flex; flex-direction: column; width: 35%;">
+        <!-- Text input fields for user details like name, email, and shipping address -->
+        <label for="first-name">First Name:</label>
+        <input type="text" id="first-name" name="first-name" value=" ">
+        <label for="last-name">Last Name:</label>
+        <input type="text" id="last-name" name="last-name" value=" ">
+        <label for="email">Email:</label>
+        <input type="email" id="email" name="email" value="learod789@gmail.com">
+        <label for="phone">Phone Number:</label>
+        <input type="number" id="phone" name="phone" value=" ">
+        <h4>Shipping Address</h4>
+        <label for="address1">Address Line 1:</label>
+        <input type="text" id="address1" name="address1" value=" ">
+        <label for="address2">Address Line 2:</label>
+        <input type="text" id="address2" name="address2">
+        <label for="neighborhood">Neighborhood:</label>
+        <input type="text" id="neighborhood" name="neighborhood" value=" ">
+        <label for="city">City:</label>
+        <input type="text" id="city" name="city" value=" ">
+        <label for="state">State:</label>
+        <input type="text" id="state" name="state" value=" ">
+        <label for="zip">Zip Code:</label>
+        <input type="number" id="zip" name="zip" value=" ">
+        <label for="country">Country:</label>
+        <input type="text" id="country" name="country" value="US">
+    </form>
+
+    <!-- Container for PayPal buttons -->
+    <div id="paypal-button-container"></div>
+    <!-- Container to display a thank-you message after a successful transaction -->
+    <div id="thank-you-message"></div>
+
+    <script>
+        // Update hidden fields for price and item number when the product selection changes
+        document.getElementById('product').addEventListener('change', function() {
+            const selectedOption = this.options[this.selectedIndex];
+            document.getElementById('product-price').value = selectedOption.getAttribute('data-price');
+            document.getElementById('item-number').value = selectedOption.getAttribute('data-item-number');
+        });
+
+        // PayPal button on the page
+        paypal.Buttons({
+            fundingSource: paypal.FUNDING.PAYPAL,  // Only allow payments using PayPal wallet
+            createOrder: function(data, actions) {
+                // Collect buyer info and product details to send to the server
+                const productPrice = document.getElementById('product-price').value;
+                const itemNumber = document.getElementById('item-number').value;
+
+                // Make a POST request to the public cloud service to create an order
+                return fetch('http://34.31.145.96:3000/create-order', {
+                    method: 'post',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        firstName: document.getElementById('first-name').value,
+                        lastName: document.getElementById('last-name').value,
+                        email: document.getElementById('email').value,
+                        phone: document.getElementById('phone').value,
+                        address1: document.getElementById('address1').value,
+                        address2: document.getElementById('address2').value,
+                        neighborhood: document.getElementById('neighborhood').value,
+                        city: document.getElementById('city').value,
+                        state: document.getElementById('state').value,
+                        zip: document.getElementById('zip').value,
+                        country: document.getElementById('country').value,
+                        productPrice: productPrice,  // Include selected product price
+                        itemNumber: itemNumber       // Include selected product item number
+                    })
+                }).then(function(res) {
+                    return res.json();
+                }).then(function(orderData) {
+                    return orderData.id;  // Return the order ID to PayPal for processing
+                });
+            },
+            onApprove: function(data, actions) {
+                // Once the payment is approved, it captures the order by sending the order ID to the server
+                return fetch('http://34.31.145.96:3000/capture-order', {
+                    method: 'post',
+                    headers: {
+                        'content-type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        orderID: data.orderID  // Send the PayPal order ID to the server
+                    })
+                }).then(function(res) {
+                    return res.json();
+                }).then(function(orderData) {
+                    // Display a thank-you message along with the transaction ID
+                    document.getElementById('thank-you-message').innerHTML = 
+                        'Thank you for your purchase! Transaction ID: ' + orderData.id;
+                });
+            }
+        }).render('#paypal-button-container');  // Render the button in the designated div
+
+    </script>
+</body>
+</html>
